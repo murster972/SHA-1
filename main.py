@@ -4,6 +4,8 @@ import sys
 
 #BUG: Hash values not the same as hash vals generated online,
 #     unsure why, go through and check algo matches SHA-1 algo.
+#BUG: POSSIBLE: Bitwsie operations not behaving correctly when going
+#     from binary string or hex string to int
 
 class SHA1:
     def sha1(self, msg):
@@ -25,6 +27,8 @@ class SHA1:
 
                 a1, b1, c1, d1, e1 = a, b, c, d, e
                 a = self.function_t(b1, c1, d1, k[1])
+                print(b1, c1, d1, k[1])
+                print(a)
                 a = (int(a, 2) + int(e1, 16)) % 2**32
                 a = (a + int(self.circular_shift(a1, 5), 16)) % 2**32
                 a = (a + int(w[i], 2)) % 2**32
@@ -65,6 +69,7 @@ class SHA1:
     def function_t(self, b, c, d, t):
         if t == 1:
             x = (int(b, 16) & int(c, 16)) | (int(b, 16) & int(d, 16))
+        #BUG: not returning correct value, unkown why
         elif t == 2 or t == 4:
             x = int(b, 16) ^ int(c, 16) ^ int(d, 16)
         elif t == 3:
@@ -78,6 +83,7 @@ class SHA1:
         return self.to_hex(x1)
 
     def to_hex(self, h):
+        #return str(hex(int(h, 2)))[2:]
         x = [h[i - 4:i] for i in range(4, len(h) + 1, 4)]
         hex_vals = {10: "A", 11: "B", 12: "C", 13: "D", 14: "E", 15: "F"}
         h_val = ""
