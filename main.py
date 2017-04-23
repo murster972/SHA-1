@@ -5,6 +5,8 @@ import sys
 #BUG: Hash values not the same as hash vals generated online,
 #     unsure why, go through and check algo matches SHA-1 algo.
 #NOTE: bitwise ops not the problem
+#NOTE: value being generated: AF1300454CEF6F60D2A83369F88538FB06100C23
+#      correct value:         a9993e364706816aba3e25717850c26c9cd0d89d
 
 class SHA1:
     def sha1(self, msg):
