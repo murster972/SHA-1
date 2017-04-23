@@ -4,8 +4,7 @@ import sys
 
 #BUG: Hash values not the same as hash vals generated online,
 #     unsure why, go through and check algo matches SHA-1 algo.
-#BUG: POSSIBLE: Bitwsie operations not behaving correctly when going
-#     from binary string or hex string to int
+#NOTE: bitwise ops not the problem
 
 class SHA1:
     def sha1(self, msg):
@@ -27,8 +26,6 @@ class SHA1:
 
                 a1, b1, c1, d1, e1 = a, b, c, d, e
                 a = self.function_t(b1, c1, d1, k[1])
-                print(b1, c1, d1, k[1])
-                print(a)
                 a = (int(a, 2) + int(e1, 16)) % 2**32
                 a = (a + int(self.circular_shift(a1, 5), 16)) % 2**32
                 a = (a + int(w[i], 2)) % 2**32
@@ -63,17 +60,28 @@ class SHA1:
         for j in range(16, 80):
             tmp = int(w[j - 16], 2) ^ int(w[j - 14], 2) ^ int(w[j - 8], 2) ^ int(w[j - 3], 2)
             tmp = self.padd(tmp)
+            #tmp = self.bitwise("^", [int(w[j - 16], 2), int(w[j - 14], 2), int(w[j - 8], 2), int(w[j - 3], 2)])
             w.append(tmp[1:] + tmp[0])
         return w
 
     def function_t(self, b, c, d, t):
         if t == 1:
             x = (int(b, 16) & int(c, 16)) | (int(b, 16) & int(d, 16))
-        #BUG: not returning correct value, unkown why
+            #x = self.padd(x)
+            """x2 = self.bitwise("&", [int(b, 16), int(c, 16)])
+            x1 = self.bitwise("&", [int(b, 16), int(d, 16)])
+            x = self.bitwise("|", [int(x2, 2), int(x1, 2)])"""
         elif t == 2 or t == 4:
             x = int(b, 16) ^ int(c, 16) ^ int(d, 16)
+            #x = self.padd(x)
+            #x = self.bitwise("^", [int(b, 16), int(c, 16), int(d, 16)])
         elif t == 3:
             x = (int(b, 16) & int(c, 16)) | (int(b, 16) & int(d, 16)) | (int(c, 16) & int(d, 16))
+            #x = self.padd(x)
+            """x3 = self.bitwise("&", [int(b, 16), int(c, 16)])
+            x2 = self.bitwise("&", [int(b, 16), int(d, 16)])
+            x1 = self.bitwise("&", [int(c, 16), int(d, 16)])
+            x = self.bitwise("|", [int(x3, 2), int(x2, 2), int(x1, 2)])"""
         return self.padd(x)
 
     def circular_shift(self, x, shift):
@@ -91,6 +99,26 @@ class SHA1:
             i = int(b, 2)
             h_val += str(i) if i < 10 else hex_vals[i]
         return h_val
+
+    """#custom bitwise ops, checking if results are different from built-in bitwise ops
+    #and, or, xor
+    def bitwise(self, op, vals):
+        if len(vals) < 2: return -1
+        #max val of number passed is 2**32 bits
+        v = [self.padd(x) for x in vals]
+        a = ""
+        for i in range(32):
+            bits = []
+            for j in range(len(v)):
+                bits.append(v[j][i])
+            if op == "^":
+                a += str(sum([int(x) for x in bits]) % 2)
+            elif op == "&" and "0" not in bits: a += "1"
+            elif op == "|" and "1" in bits: a += "1"
+            #elif op == "^" and bits.count("1") == 1: a += "1"
+            else:
+                a += "0"
+        return a"""
 
 if __name__ == '__main__':
     msg = "abc"
