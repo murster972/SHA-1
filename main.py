@@ -1,129 +1,122 @@
 #!/usr/bin/env python3
-import os
 import sys
+import math
 
-#BUG: Hash values not the same as hash vals generated online,
-#     unsure why, go through and check algo matches SHA-1 algo.
-#NOTE: bitwise ops not the problem
-#NOTE: value being generated: AF1300454CEF6F60D2A83369F88538FB06100C23
-#      correct value:         a9993e364706816aba3e25717850c26c9cd0d89d
+#NOTE: IT FUCKING WORKS NOW :D
+#NOTE: The reason for it initally producing an incorrect hash values:
+#       Using an XOR sum instead mod 2**32 when adding values during rounds
+#       The second B value in the first round function was not inversed
 
 class SHA1:
-    def sha1(self, msg):
-        self.m = "".join(["0" + str(bin(ord(x)))[2:] for x in msg])
-        self.block_padding()
-        blocks = [self.m[x - 512:x] for x in range(512, len(self.m) + 1, 32)]
+    def get_hash(self, m):
+        self.m = m
 
-        H = ("67452301", "EFCDAB89", "98BADCFE", "10325476", "C3D2E1F0")
+        #padds m
+        padded = self.padd()
 
-        for b in blocks:
-            w = self.msg_schedule(b)
-            a, b, c, d, e = H
+        #splits m into 512-but blocks
+        x_values = [padded[i - 512:i] for i in range(512, len(padded) + 1, 512)]
 
-            for i in range(0, 80):
-                if i <= 19: k = ("5A827999", 1)
-                elif i <= 39: k = ("6ED9EBA1", 2)
-                elif i <= 59: k = ("8F1BBCDC", 3)
-                elif i <= 79: k = ("CA62C1D6", 4)
+        #inital hash value
+        h = ["67452301", "EFCDAB89", "98BADCFE", "10325476", "C3D2E1F0"]
+        h = [bin(int(i, 16))[2:] for i in h]
+        h = [("0" * (32 - len(i))) + i for i in h]
+        h0, h1, h2, h3, h4 = tuple(h)
 
-                a1, b1, c1, d1, e1 = a, b, c, d, e
-                a = self.function_t(b1, c1, d1, k[1])
-                a = (int(a, 2) + int(e1, 16)) % 2**32
-                a = (a + int(self.circular_shift(a1, 5), 16)) % 2**32
-                a = (a + int(w[i], 2)) % 2**32
-                a = self.padd((a + int(k[0], 16)) % 2**32)
-                a = self.to_hex(a)
+        keys = ["5A827999", "6ED9EBA1", "8F1BBCDC", "CA62C1D6"]
+        keys = [bin(int(i, 16))[2:] for i in keys]
+        keys = [("0" * (32 - len(i))) + i for i in keys]
 
-                b = a1
-                c = self.circular_shift(b1, 30)
-                d = c1
-                e = d1
+        #80-rounds for each 512-bit value
+        for x in x_values:
+            #80 32-bit words used in the 80 rounds
+            words = []
 
-            a = self.padd((int(a, 16) + int(H[0], 16)) % 2**32)
-            c = self.padd((int(c, 16) + int(H[1], 16)) % 2**32)
-            b = self.padd((int(b, 16) + int(H[2], 16)) % 2**32)
-            d = self.padd((int(d, 16) + int(H[3], 16)) % 2**32)
-            e = self.padd((int(e, 16) + int(H[4], 16)) % 2**32)
-            H = self.to_hex(a), self.to_hex(b), self.to_hex(c), self.to_hex(d), self.to_hex(e)
-        return "".join(H)
+            for i in range(32, 2561, 32):
+                if i // 32 <= 16:
+                    words.append(x[i - 32:i])
+                else:
+                    j = i // 32 - 1
+                    w = [words[j - 16], words[j - 14], words[j - 8], words[j - 3]]
+                    word = ""
 
-    def block_padding(self):
-        l = str(bin(len(self.m)))[2:]
-        k = ((447 - int(l, 2)) % 512 + 512) % 512
-        self.m += "1" + ("0" * k) + ("0" * (64 - len(l))) + l
+                    for i in range(32): word += str(sum([int(s[i]) for s in w]) % 2)
 
-    def padd(self, x):
-        x = str(bin(x))[2:]
-        return ("0" * (32 - len(x))) + x
+                    words.append(word[1:] + word[0])
 
-    def msg_schedule(self, b):
-        w = [b[x - 32:x] for x in range(32, len(b) + 1, 32)]
+            a, b, c, d, e = h0, h1, h2, h3, h4
 
-        for j in range(16, 80):
-            tmp = int(w[j - 16], 2) ^ int(w[j - 14], 2) ^ int(w[j - 8], 2) ^ int(w[j - 3], 2)
-            tmp = self.padd(tmp)
-            #tmp = self.bitwise("^", [int(w[j - 16], 2), int(w[j - 14], 2), int(w[j - 8], 2), int(w[j - 3], 2)])
-            w.append(tmp[1:] + tmp[0])
-        return w
+            for i in range(80):
+                f = self.f_t(i, b, c, d)
+                if i < 20: k = keys[0]
+                elif i < 40: k = keys[1]
+                elif i < 60: k = keys[2]
+                else: k = keys[3]
 
-    def function_t(self, b, c, d, t):
-        if t == 1:
-            x = (int(b, 16) & int(c, 16)) | (int(b, 16) & int(d, 16))
-            #x = self.padd(x)
-            """x2 = self.bitwise("&", [int(b, 16), int(c, 16)])
-            x1 = self.bitwise("&", [int(b, 16), int(d, 16)])
-            x = self.bitwise("|", [int(x2, 2), int(x1, 2)])"""
-        elif t == 2 or t == 4:
-            x = int(b, 16) ^ int(c, 16) ^ int(d, 16)
-            #x = self.padd(x)
-            #x = self.bitwise("^", [int(b, 16), int(c, 16), int(d, 16)])
-        elif t == 3:
-            x = (int(b, 16) & int(c, 16)) | (int(b, 16) & int(d, 16)) | (int(c, 16) & int(d, 16))
-            #x = self.padd(x)
-            """x3 = self.bitwise("&", [int(b, 16), int(c, 16)])
-            x2 = self.bitwise("&", [int(b, 16), int(d, 16)])
-            x1 = self.bitwise("&", [int(c, 16), int(d, 16)])
-            x = self.bitwise("|", [int(x3, 2), int(x2, 2), int(x1, 2)])"""
-        return self.padd(x)
+                tmp = e
+                b, c, d, e = a, self.circular_shift(b, 30), c, d
 
-    def circular_shift(self, x, shift):
-        x1 = self.padd(int(x, 16))
-        for i in range(0, shift):
-            x1 = x1[1:] + x1[0]
-        return self.to_hex(x1)
+                tmp = [tmp, f, self.circular_shift(a, 5), words[i], k]
+                tmp = bin(sum([int(i, 2) for i in tmp]) % pow(2, 32))[2:]
+                tmp = ("0" * (32 - len(tmp))) + tmp
+                a = tmp
 
-    def to_hex(self, h):
-        #return str(hex(int(h, 2)))[2:]
-        x = [h[i - 4:i] for i in range(4, len(h) + 1, 4)]
-        hex_vals = {10: "A", 11: "B", 12: "C", 13: "D", 14: "E", 15: "F"}
-        h_val = ""
-        for b in x:
-            i = int(b, 2)
-            h_val += str(i) if i < 10 else hex_vals[i]
-        return h_val
+                #NOTE: may not be an XOR sum
+                #NOTE: Its not a fucking XOR SUM, silly cunt...
 
-    """#custom bitwise ops, checking if results are different from built-in bitwise ops
-    #and, or, xor
-    def bitwise(self, op, vals):
-        if len(vals) < 2: return -1
-        #max val of number passed is 2**32 bits
-        v = [self.padd(x) for x in vals]
-        a = ""
-        for i in range(32):
-            bits = []
-            for j in range(len(v)):
-                bits.append(v[j][i])
-            if op == "^":
-                a += str(sum([int(x) for x in bits]) % 2)
-            elif op == "&" and "0" not in bits: a += "1"
-            elif op == "|" and "1" in bits: a += "1"
-            #elif op == "^" and bits.count("1") == 1: a += "1"
-            else:
-                a += "0"
-        return a"""
+            a = bin((int(a, 2) + int(h0, 2)) % pow(2, 32))[2:]
+            b = bin((int(b, 2) + int(h1, 2)) % pow(2, 32))[2:]
+            c = bin((int(c, 2) + int(h2, 2)) % pow(2, 32))[2:]
+            d = bin((int(d, 2) + int(h3, 2)) % pow(2, 32))[2:]
+            e = bin((int(e, 2) + int(h4, 2)) % pow(2, 32))[2:]
+
+            abcde = [a, b, c, d, e]
+
+            for i in range(5):
+                abcde[i] = ("0" * (32 - len(abcde[i]))) + abcde[i]
+
+            h0, h1, h2, h3, h4 = tuple(abcde)
+
+        h = h0 + h1 + h2 + h3 + h4
+
+        print(hex(int(h, 2))[2:])
+        #return hex(int(h, 2))[2:]
+
+    def f_t(self, t, b, c, d):
+        #NOTE: second value of b has line above it in book, may mean something
+        #NOTE: It means the inverse of b you cunt...
+        b_inverse = "".join(["0" if i == "1" else "1" for i in b])
+
+        if t < 20: r = (int(b, 2) & int(c, 2)) | (int(b_inverse, 2) & int(d, 2))
+        elif t < 40: r = int(b, 2) ^ int(c, 2) ^ int(d, 2)
+        elif t < 60: r = (int(b, 2) & int(c, 2)) | (int(b, 2) & int(d, 2)) | (int(c, 2) & int(d, 2))
+        else: r = int(b, 2) ^ int(c, 2) ^ int(d, 2)
+
+        r_bin = bin(r)[2:]
+
+        return ("0" * (32 - len(r_bin))) + r_bin
+
+    def padd(self):
+        bin_m = [bin(ord(i))[2:] for i in self.m]
+        bin_m = [("0" * (8 - len(i))) + i for i in bin_m]
+
+        l = len(bin_m) * 8
+        l_bin_padd = 64 - int(math.floor(math.log(l, 2)) + 1)
+
+        if l_bin_padd < 0:
+            raise Exception("m cannot more than 2**64 bits in length")
+
+        k = (448 - (l + 1)) % 512
+
+        padd_m = "".join(bin_m) + "1" + ("0" * k)
+        padd_m += ("0" * l_bin_padd) + bin(l)[2:]
+
+        return padd_m
+
+    def circular_shift(self, b, x):
+        t = b
+        for i in range(x): t = t[1:] + t[0]
+        return t
 
 if __name__ == '__main__':
-    msg = "abc"
-    #hash_val = SHA1().function_t("EFCDAB89", "98BADCFE", "10325476", 4)
-    hash_val = SHA1().sha1(msg)
-    print(hash_val)
+    SHA1().get_hash("abwekfnlkm;lwefijowneimf;klc")
