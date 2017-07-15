@@ -11,25 +11,19 @@ class SHA1:
     def get_hash(self, m):
         self.m = m
 
-        #padds m
+        if not self.m: raise Exception("m cannot be an empty.")
+
         padded = self.padd()
 
-        #splits m into 512-but blocks
         x_values = [padded[i - 512:i] for i in range(512, len(padded) + 1, 512)]
 
-        #inital hash value
         h = ["67452301", "EFCDAB89", "98BADCFE", "10325476", "C3D2E1F0"]
-        h = [bin(int(i, 16))[2:] for i in h]
-        h = [("0" * (32 - len(i))) + i for i in h]
-        h0, h1, h2, h3, h4 = tuple(h)
+        h = [self.padd_bin(bin(int(i, 16))[2:]) for i in h]
 
         keys = ["5A827999", "6ED9EBA1", "8F1BBCDC", "CA62C1D6"]
-        keys = [bin(int(i, 16))[2:] for i in keys]
-        keys = [("0" * (32 - len(i))) + i for i in keys]
+        keys = [self.padd_bin(bin(int(i, 16))[2:]) for i in keys]
 
-        #80-rounds for each 512-bit value
         for x in x_values:
-            #80 32-bit words used in the 80 rounds
             words = []
 
             for i in range(32, 2561, 32):
@@ -44,7 +38,7 @@ class SHA1:
 
                     words.append(word[1:] + word[0])
 
-            a, b, c, d, e = h0, h1, h2, h3, h4
+            a, b, c, d, e = tuple(h)
 
             for i in range(80):
                 f = self.f_t(i, b, c, d)
@@ -58,53 +52,35 @@ class SHA1:
 
                 tmp = [tmp, f, self.circular_shift(a, 5), words[i], k]
                 tmp = bin(sum([int(i, 2) for i in tmp]) % pow(2, 32))[2:]
-                tmp = ("0" * (32 - len(tmp))) + tmp
-                a = tmp
+                a = self.padd_bin(tmp)
 
-                #NOTE: may not be an XOR sum
-                #NOTE: Its not a fucking XOR SUM, silly cunt...
-
-            a = bin((int(a, 2) + int(h0, 2)) % pow(2, 32))[2:]
-            b = bin((int(b, 2) + int(h1, 2)) % pow(2, 32))[2:]
-            c = bin((int(c, 2) + int(h2, 2)) % pow(2, 32))[2:]
-            d = bin((int(d, 2) + int(h3, 2)) % pow(2, 32))[2:]
-            e = bin((int(e, 2) + int(h4, 2)) % pow(2, 32))[2:]
-
-            abcde = [a, b, c, d, e]
+            reg = [a, b, c, d, e]
 
             for i in range(5):
-                abcde[i] = ("0" * (32 - len(abcde[i]))) + abcde[i]
+                n = bin((int(reg[i], 2) + int(h[i], 2)) % pow(2, 32))[2:]
+                reg[i] = self.padd_bin(n)
 
-            h0, h1, h2, h3, h4 = tuple(abcde)
+            h = [] + reg
 
-        h = h0 + h1 + h2 + h3 + h4
-
-        print(hex(int(h, 2))[2:])
-        #return hex(int(h, 2))[2:]
+        return hex(int("".join(reg), 2))[2:]
 
     def f_t(self, t, b, c, d):
-        #NOTE: second value of b has line above it in book, may mean something
-        #NOTE: It means the inverse of b you cunt...
-        b_inverse = "".join(["0" if i == "1" else "1" for i in b])
+        b_inverse = int("".join(["0" if i == "1" else "1" for i in b]), 2)
+        b_i, c_i, d_i = int(b, 2), int(c, 2), int(d, 2)
 
-        if t < 20: r = (int(b, 2) & int(c, 2)) | (int(b_inverse, 2) & int(d, 2))
-        elif t < 40: r = int(b, 2) ^ int(c, 2) ^ int(d, 2)
-        elif t < 60: r = (int(b, 2) & int(c, 2)) | (int(b, 2) & int(d, 2)) | (int(c, 2) & int(d, 2))
-        else: r = int(b, 2) ^ int(c, 2) ^ int(d, 2)
+        if t < 20: r = (b_i & c_i) | (b_inverse & d_i)
+        elif t < 40 or (t > 59 and t < 80): r = b_i ^ c_i ^ d_i
+        else: r = (b_i & c_i) | (b_i & d_i) | (c_i & d_i)
 
-        r_bin = bin(r)[2:]
-
-        return ("0" * (32 - len(r_bin))) + r_bin
+        return self.padd_bin(bin(r)[2:])
 
     def padd(self):
-        bin_m = [bin(ord(i))[2:] for i in self.m]
-        bin_m = [("0" * (8 - len(i))) + i for i in bin_m]
+        bin_m = [self.padd_bin(bin(ord(i))[2:], 8) for i in self.m]
 
         l = len(bin_m) * 8
         l_bin_padd = 64 - int(math.floor(math.log(l, 2)) + 1)
 
-        if l_bin_padd < 0:
-            raise Exception("m cannot more than 2**64 bits in length")
+        if l_bin_padd < 0: raise Exception("m cannot more than 2**64 bits in length")
 
         k = (448 - (l + 1)) % 512
 
@@ -118,5 +94,10 @@ class SHA1:
         for i in range(x): t = t[1:] + t[0]
         return t
 
+    def padd_bin(self, v, l=32):
+        return ("0" * (l - len(v))) + v
+
 if __name__ == '__main__':
-    SHA1().get_hash("abwekfnlkm;lwefijowneimf;klc")
+    m = "7398029-r0[lp2,3lrmkpni2-3or[p23rm]]"
+    h = SHA1().get_hash(m)
+    print(h)
