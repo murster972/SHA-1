@@ -42,10 +42,7 @@ class SHA1:
 
             for i in range(80):
                 f = self.f_t(i, b, c, d)
-                if i < 20: k = keys[0]
-                elif i < 40: k = keys[1]
-                elif i < 60: k = keys[2]
-                else: k = keys[3]
+                k = keys[math.ceil((i + 1) / 20) - 1]
 
                 tmp = e
                 b, c, d, e = a, self.circular_shift(b, 30), c, d
@@ -98,6 +95,6 @@ class SHA1:
         return ("0" * (l - len(v))) + v
 
 if __name__ == '__main__':
-    m = "7398029-r0[lp2,3lrmkpni2-3or[p23rm]]"
+    m = "jowipkoe[lp]f;mwklefjuoweijpfko["
     h = SHA1().get_hash(m)
     print(h)
